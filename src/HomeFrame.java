@@ -3,6 +3,7 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.RoundRectangle2D;
+import java.awt.image.BufferedImage;
 import java.net.URL;
 
 public class HomeFrame extends JFrame {
@@ -10,7 +11,6 @@ public class HomeFrame extends JFrame {
     private final String email;
     private final int userId;
 
-    // Refs para refreshTheme
     private JPanel sidebar, mainContent, topbar, centerPanel, logoRow, logoText, userCard;
     private KanbanPanel kanbanPanel;
     private CalendarPanel calendarPanel;
@@ -20,6 +20,7 @@ public class HomeFrame extends JFrame {
     private JButton activeNav, themeBtn;
     private JButton kanbanBtn, calBtn, statsBtn;
     private JLabel logoImgLabel;
+    private JButton logoutBtn;
 
     public HomeFrame(String email) {
         this.email = email;
@@ -55,18 +56,32 @@ public class HomeFrame extends JFrame {
         }
     }
 
-    // Devuelve color de sidebar según tema:
-    // oscuro → casi negro; claro → blanco con borde derecho
+    // ── Colores según tema ────────────────────────────────────────────
+
     private Color sidebarBg() {
-        return ThemeManager.isDark() ? AppColors.DARK_SIDEBAR : new Color(250, 250, 252);
+        return ThemeManager.isDark()
+                ? AppColors.DARK_SIDEBAR
+                : new Color(250, 250, 252);
     }
 
     private Color sidebarText() {
-        return ThemeManager.isDark() ? new Color(148, 163, 184) : new Color(80, 90, 110);
+        // FIX: en claro, texto más oscuro para mayor contraste
+        return ThemeManager.isDark()
+                ? new Color(148, 163, 184)
+                : new Color(55, 65, 81);
     }
 
     private Color sidebarBorder() {
-        return ThemeManager.isDark() ? new Color(30, 30, 46) : new Color(220, 225, 235);
+        return ThemeManager.isDark()
+                ? new Color(30, 30, 46)
+                : new Color(220, 225, 235);
+    }
+
+    /** Color de fondo activo del nav según tema */
+    private Color navActiveBg() {
+        return ThemeManager.isDark()
+                ? AppColors.ACCENT_SOFT
+                : new Color(237, 228, 255);
     }
 
     private void initUI() {
@@ -77,7 +92,6 @@ public class HomeFrame extends JFrame {
         sidebar = new JPanel() {
             protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
-                // Borde derecho sutil
                 g.setColor(sidebarBorder());
                 g.fillRect(getWidth() - 1, 0, 1, getHeight());
             }
@@ -87,7 +101,7 @@ public class HomeFrame extends JFrame {
         sidebar.setPreferredSize(new Dimension(216, 0));
         sidebar.setBorder(new EmptyBorder(20, 14, 20, 14));
 
-        // Logo row — imagen real + nombre
+        // Logo
         logoRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
         logoRow.setOpaque(false);
         logoRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 50));
@@ -101,25 +115,14 @@ public class HomeFrame extends JFrame {
         appLabel.setFont(new Font("Segoe UI", Font.BOLD, 15));
         appLabel.setForeground(ThemeManager.isDark() ? Color.WHITE : new Color(20, 25, 40));
         logoText.add(appLabel);
-
         logoRow.add(logoImgLabel);
         logoRow.add(logoText);
 
         // Usuario
         String nombre = AuthService.getNombre(email);
-        userCard = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 8));
-        userCard.setBackground(ThemeManager.isDark()
-                ? new Color(255, 255, 255, 15)
-                : new Color(0, 0, 0, 8));
-        userCard.setMaximumSize(new Dimension(Integer.MAX_VALUE, 54));
-        JPanel avatar = buildAvatar(nombre);
-        JLabel userLbl = new JLabel(nombre);
-        userLbl.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        userLbl.setForeground(sidebarText());
-        userCard.add(avatar);
-        userCard.add(userLbl);
+        userCard = buildUserCard(nombre);
 
-        // Botones de navegación
+        // Nav buttons
         kanbanBtn = buildNavBtn("  ▦  Kanban");
         calBtn = buildNavBtn("  ◫  Calendario");
         statsBtn = buildNavBtn("  ◈  Estadísticas");
@@ -130,7 +133,7 @@ public class HomeFrame extends JFrame {
         calBtn.addActionListener(e -> navigate("calendar", calBtn));
         statsBtn.addActionListener(e -> navigate("stats", statsBtn));
 
-        // Botón tema
+        // Tema
         themeBtn = new JButton(ThemeManager.isDark() ? "☀  Modo claro" : "☾  Modo oscuro");
         styleSecondaryBtn(themeBtn);
         themeBtn.addActionListener(e -> {
@@ -139,8 +142,8 @@ public class HomeFrame extends JFrame {
             refreshTheme();
         });
 
-        // Botón logout
-        JButton logoutBtn = new JButton("  ⏻  Cerrar sesión");
+        // Logout
+        logoutBtn = new JButton("  ⏻  Cerrar sesión");
         logoutBtn.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         logoutBtn.setForeground(AppColors.STATUS_TODO);
         logoutBtn.setBackground(new Color(0, 0, 0, 0));
@@ -182,7 +185,7 @@ public class HomeFrame extends JFrame {
         pageTitle.setForeground(AppColors.textPrimary());
         topbar.add(pageTitle, BorderLayout.WEST);
 
-        // ── MAIN CONTENT ─────────────────────────────────────────────
+        // ── MAIN ─────────────────────────────────────────────────────
         cardLayout = new CardLayout();
         mainContent = new JPanel(cardLayout);
         mainContent.setBackground(AppColors.bg());
@@ -232,10 +235,8 @@ public class HomeFrame extends JFrame {
     private void setNavActive(JButton btn) {
         btn.setOpaque(true);
         btn.setContentAreaFilled(true);
-        btn.setBackground(ThemeManager.isDark()
-                ? AppColors.ACCENT_SOFT
-                : new Color(237, 228, 255));
-        btn.setForeground(new Color(167, 139, 250));
+        btn.setBackground(navActiveBg());
+        btn.setForeground(new Color(124, 58, 237)); // púrpura consistente en ambos temas
     }
 
     private void setNavInactive(JButton btn) {
@@ -245,31 +246,36 @@ public class HomeFrame extends JFrame {
         btn.setForeground(sidebarText());
     }
 
-    // ── refreshTheme — actualiza TODOS los componentes ───────────────
+    // ── refreshTheme ─────────────────────────────────────────────────
 
     private void refreshTheme() {
-        // Contenedor raíz
+        // Raíz
         getContentPane().setBackground(AppColors.bg());
 
         // Sidebar
         sidebar.setBackground(sidebarBg());
         sidebar.repaint();
 
-        logoRow.setBackground(sidebarBg());
-        logoText.setBackground(sidebarBg());
+        // Logo text
         appLabel.setForeground(ThemeManager.isDark() ? Color.WHITE : new Color(20, 25, 40));
 
-        userCard.setBackground(ThemeManager.isDark()
-                ? new Color(255, 255, 255, 15)
-                : new Color(0, 0, 0, 8));
-
-        // Actualizar color texto usuario
-        for (Component c : userCard.getComponents()) {
-            if (c instanceof JLabel)
-                ((JLabel) c).setForeground(sidebarText());
+        // FIX: Reconstruir userCard con colores actualizados
+        String nombre = AuthService.getNombre(email);
+        int userCardIndex = -1;
+        Component[] sidebarComps = sidebar.getComponents();
+        for (int i = 0; i < sidebarComps.length; i++) {
+            if (sidebarComps[i] == userCard) {
+                userCardIndex = i;
+                break;
+            }
+        }
+        userCard = buildUserCard(nombre);
+        if (userCardIndex >= 0) {
+            sidebar.remove(userCardIndex);
+            sidebar.add(userCard, userCardIndex);
         }
 
-        // Botones de nav — repintar activo/inactivo
+        // Nav buttons
         for (JButton btn : new JButton[] { kanbanBtn, calBtn, statsBtn }) {
             if (btn == activeNav)
                 setNavActive(btn);
@@ -291,7 +297,10 @@ public class HomeFrame extends JFrame {
         centerPanel.setBackground(AppColors.bg());
         mainContent.setBackground(AppColors.bg());
 
-        // Propagar a sub-paneles
+        // FIX: Forzar repintado del topbar con borde correcto
+        topbar.repaint();
+
+        // Sub-paneles
         if (kanbanPanel != null) {
             kanbanPanel.setBackground(AppColors.bg());
             kanbanPanel.refreshColors();
@@ -304,23 +313,79 @@ public class HomeFrame extends JFrame {
             statsPanel.setBackground(AppColors.bg());
         }
 
+        sidebar.revalidate();
+        sidebar.repaint();
         repaint();
         revalidate();
     }
 
     // ── Helpers ──────────────────────────────────────────────────────
 
-    /** Carga logo.png; si falla dibuja el icono OV */
+    private JPanel buildUserCard(String nombre) {
+        JPanel card = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 8));
+        // FIX: Color de fondo correcto según tema
+        card.setBackground(ThemeManager.isDark()
+                ? new Color(255, 255, 255, 15)
+                : new Color(124, 58, 237, 18));
+        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 54));
+        card.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JPanel avatar = buildAvatar(nombre);
+        JLabel userLbl = new JLabel(nombre);
+        userLbl.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        userLbl.setForeground(ThemeManager.isDark() ? new Color(220, 220, 240) : new Color(55, 65, 81));
+        card.add(avatar);
+        card.add(userLbl);
+        return card;
+    }
+
+    /**
+     * FIX: Usa interpolación bicúbica igual que LoginFrame.buildLogoImage()
+     */
     private JLabel buildLogoLabel(int size) {
         try {
             URL url = getClass().getResource("assets/logo.png");
+            if (url == null)
+                url = getClass().getResource("/assets/logo.png");
             if (url != null) {
-                Image img = new ImageIcon(url).getImage().getScaledInstance(size, size, Image.SCALE_SMOOTH);
-                return new JLabel(new ImageIcon(img));
+                ImageIcon raw = new ImageIcon(url);
+                Image original = raw.getImage();
+                MediaTracker tracker = new MediaTracker(new JLabel());
+                tracker.addImage(original, 0);
+                try {
+                    tracker.waitForAll();
+                } catch (InterruptedException ignored) {
+                }
+
+                int iw = raw.getIconWidth();
+                int ih = raw.getIconHeight();
+
+                BufferedImage hq = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+                Graphics2D g2 = hq.createGraphics();
+                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                        RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+                g2.setRenderingHint(RenderingHints.KEY_RENDERING,
+                        RenderingHints.VALUE_RENDER_QUALITY);
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                        RenderingHints.VALUE_ANTIALIAS_ON);
+                if (iw > 0 && ih > 0) {
+                    int crop = Math.min(iw, ih);
+                    int srcX = (iw - crop) / 2;
+                    int srcY = (ih - crop) / 2;
+                    g2.drawImage(original,
+                            0, 0, size, size,
+                            srcX, srcY, srcX + crop, srcY + crop,
+                            null);
+                } else {
+                    g2.drawImage(original, 0, 0, size, size, null);
+                }
+                g2.dispose();
+                return new JLabel(new ImageIcon(hq));
             }
         } catch (Exception ignored) {
         }
-        // fallback pintado
+
+        // Fallback pintado
         return new JLabel() {
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();

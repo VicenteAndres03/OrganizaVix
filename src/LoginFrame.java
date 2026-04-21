@@ -3,6 +3,7 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.*;
+import java.awt.image.BufferedImage;
 import java.net.URL;
 
 public class LoginFrame extends JFrame {
@@ -75,22 +76,27 @@ public class LoginFrame extends JFrame {
         loginBtn.addActionListener(e -> handleLogin());
         passwordField.addActionListener(e -> handleLogin());
 
-        JPanel linksRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 0));
-        linksRow.setBackground(AppColors.bgCard());
-        linksRow.setAlignmentX(Component.LEFT_ALIGNMENT);
-        linksRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
-        JButton registerBtn = buildLinkButton("¿No tienes cuenta?");
-        JLabel sepLbl = new JLabel("·");
-        sepLbl.setForeground(AppColors.textMuted());
+        // ── FIX: Links en columna vertical para evitar que se corten ──
+        JPanel linksCol = new JPanel();
+        linksCol.setLayout(new BoxLayout(linksCol, BoxLayout.Y_AXIS));
+        linksCol.setBackground(AppColors.bgCard());
+        linksCol.setAlignmentX(Component.LEFT_ALIGNMENT);
+        linksCol.setMaximumSize(new Dimension(Integer.MAX_VALUE, 60));
+
+        JButton registerBtn = buildLinkButton("¿No tienes cuenta? Regístrate");
+        registerBtn.setAlignmentX(Component.LEFT_ALIGNMENT);
         JButton forgotBtn = buildLinkButton("Olvidé mi contraseña");
+        forgotBtn.setAlignmentX(Component.LEFT_ALIGNMENT);
+
         registerBtn.addActionListener(e -> {
             dispose();
             new RegisterFrame().setVisible(true);
         });
         forgotBtn.addActionListener(e -> new ForgotPasswordFrame().setVisible(true));
-        linksRow.add(registerBtn);
-        linksRow.add(sepLbl);
-        linksRow.add(forgotBtn);
+
+        linksCol.add(registerBtn);
+        linksCol.add(Box.createVerticalStrut(4));
+        linksCol.add(forgotBtn);
 
         themeBtnRef = buildThemeToggle();
 
@@ -110,7 +116,7 @@ public class LoginFrame extends JFrame {
         card.add(Box.createVerticalStrut(8));
         card.add(loginBtn);
         card.add(Box.createVerticalStrut(16));
-        card.add(linksRow);
+        card.add(linksCol);
         card.add(Box.createVerticalStrut(12));
         card.add(themeBtnRef);
 
@@ -127,7 +133,6 @@ public class LoginFrame extends JFrame {
         AnimationUtil.fadeIn(card);
     }
 
-    /** Construye el panel izquierdo según el tema actual */
     private JPanel buildLeftPanel() {
         JPanel panel = new JPanel() {
             protected void paintComponent(Graphics g) {
@@ -231,23 +236,18 @@ public class LoginFrame extends JFrame {
     }
 
     private void refreshTheme() {
-        // Reemplazar panel izquierdo (tiene gradiente hardcoded que cambia con el tema)
         left = buildLeftPanel();
         root.remove(0);
         root.add(left, 0);
 
-        // Panel derecho
         Component rightPanel = root.getComponent(1);
-        rightPanel.setBackground(AppColors.bg());
         ((JPanel) rightPanel).setBackground(AppColors.bg());
 
-        // Card
         card.setBackground(AppColors.bgCard());
         card.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(AppColors.border(), 1, true),
                 new EmptyBorder(44, 48, 44, 48)));
 
-        // Recorrer card y actualizar colores
         refreshContainer(card);
 
         if (themeBtnRef != null)
@@ -260,7 +260,7 @@ public class LoginFrame extends JFrame {
     private void refreshContainer(Container c) {
         for (Component comp : c.getComponents()) {
             if (comp == errorLabel)
-                continue; // no tocar color del error
+                continue;
             if (comp instanceof JTextField f) {
                 styleField(f);
             }
@@ -268,12 +268,10 @@ public class LoginFrame extends JFrame {
                 styleField(p);
             }
             if (comp instanceof JLabel lbl && comp != errorLabel) {
-                // Labels de título: color primario; los demás: secundario
                 Font font = lbl.getFont();
                 if (font.isBold() && font.getSize() >= 20)
                     lbl.setForeground(AppColors.textPrimary());
-                else if (lbl.getForeground().equals(AppColors.ACCENT)) {
-                    /* link btn label, no tocar */ } else
+                else if (!lbl.getForeground().equals(AppColors.ACCENT))
                     lbl.setForeground(AppColors.textSecondary());
             }
             if (comp instanceof JPanel p && p != card) {
@@ -285,16 +283,60 @@ public class LoginFrame extends JFrame {
 
     // ─── Static Helpers ───────────────────────────────────────────────
 
+    /**
+     * FIX: Usa RenderingHints de alta calidad para escalar el logo sin pixelado.
+     * Carga la imagen nativa y la redibuja en un BufferedImage con interpolación
+     * bicúbica.
+     */
     public static JLabel buildLogoImage(int size) {
         try {
             URL url = LoginFrame.class.getResource("/assets/logo.png");
+            if (url == null)
+                url = LoginFrame.class.getResource("assets/logo.png");
             if (url != null) {
-                Image scaled = new ImageIcon(url).getImage()
-                        .getScaledInstance(size, size, Image.SCALE_SMOOTH);
-                return new JLabel(new ImageIcon(scaled));
+                ImageIcon raw = new ImageIcon(url);
+                Image original = raw.getImage();
+                MediaTracker tracker = new MediaTracker(new JLabel());
+                tracker.addImage(original, 0);
+                try {
+                    tracker.waitForAll();
+                } catch (InterruptedException ignored) {
+                }
+
+                int iw = raw.getIconWidth();
+                int ih = raw.getIconHeight();
+
+                // --- Center-crop to square so rectangular logos don't distort ---
+                BufferedImage hq = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+                Graphics2D g2 = hq.createGraphics();
+                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                        RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+                g2.setRenderingHint(RenderingHints.KEY_RENDERING,
+                        RenderingHints.VALUE_RENDER_QUALITY);
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                        RenderingHints.VALUE_ANTIALIAS_ON);
+
+                if (iw > 0 && ih > 0) {
+                    // Determine square crop from center
+                    int crop = Math.min(iw, ih);
+                    int srcX = (iw - crop) / 2;
+                    int srcY = (ih - crop) / 2;
+                    // Draw the cropped region scaled into the square output
+                    g2.drawImage(original,
+                            0, 0, size, size,
+                            srcX, srcY, srcX + crop, srcY + crop,
+                            null);
+                } else {
+                    g2.drawImage(original, 0, 0, size, size, null);
+                }
+                g2.dispose();
+
+                return new JLabel(new ImageIcon(hq));
             }
         } catch (Exception ignored) {
         }
+
+        // Fallback pintado — igual de antes
         return new JLabel() {
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
@@ -392,7 +434,7 @@ public class LoginFrame extends JFrame {
         btn.setBorderPainted(false);
         btn.setContentAreaFilled(false);
         btn.setFocusPainted(false);
-        btn.setAlignmentX(Component.CENTER_ALIGNMENT);
+        btn.setAlignmentX(Component.LEFT_ALIGNMENT);
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         return btn;
     }
@@ -413,7 +455,7 @@ public class LoginFrame extends JFrame {
         btn.setBorderPainted(false);
         btn.setContentAreaFilled(false);
         btn.setFocusPainted(false);
-        btn.setAlignmentX(Component.CENTER_ALIGNMENT);
+        btn.setAlignmentX(Component.LEFT_ALIGNMENT);
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         btn.addActionListener(e -> {
             ThemeManager.toggle();

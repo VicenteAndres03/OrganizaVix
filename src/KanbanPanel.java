@@ -275,7 +275,7 @@ public class KanbanPanel extends JPanel {
     private void mostrarDialogoNuevaTarea() {
         JDialog dialog = new JDialog(
                 (Frame) SwingUtilities.getWindowAncestor(this), "Nueva tarea", true);
-        dialog.setSize(360, 360);
+        dialog.setSize(380, 460);
         dialog.setLocationRelativeTo(this);
         dialog.getContentPane().setBackground(AppColors.bgCard());
 

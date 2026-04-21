@@ -195,7 +195,7 @@ public class CalendarPanel extends JPanel {
         JDialog dialog = new JDialog(
                 (Frame) SwingUtilities.getWindowAncestor(this),
                 "Nueva tarea — " + fecha, true);
-        dialog.setSize(340, 280);
+        dialog.setSize(360, 420);
         dialog.setLocationRelativeTo(this);
         dialog.getContentPane().setBackground(AppColors.bgCard());
 
