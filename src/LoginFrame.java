@@ -29,9 +29,27 @@ public class LoginFrame extends JFrame {
 
     private void loadIcon() {
         try {
-            URL url = getClass().getResource("assets/logo.png");
-            if (url != null)
-                setIconImage(new ImageIcon(url).getImage());
+            URL url = getClass().getResource("/assets/logo.png");
+            if (url == null)
+                url = getClass().getResource("assets/logo.png");
+            if (url != null) {
+                ImageIcon rawIcon = new ImageIcon(url);
+                Image rawImg = rawIcon.getImage();
+                int w = rawIcon.getIconWidth();
+                int h = rawIcon.getIconHeight();
+
+                if (w > 0 && h > 0) {
+                    int size = Math.max(w, h);
+                    BufferedImage sq = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+                    Graphics2D g2 = sq.createGraphics();
+                    g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+                    g2.drawImage(rawImg, (size - w) / 2, (size - h) / 2, w, h, null);
+                    g2.dispose();
+                    setIconImage(sq);
+                } else {
+                    setIconImage(rawImg);
+                }
+            }
         } catch (Exception ignored) {
         }
     }
@@ -76,7 +94,6 @@ public class LoginFrame extends JFrame {
         loginBtn.addActionListener(e -> handleLogin());
         passwordField.addActionListener(e -> handleLogin());
 
-        // ── FIX: Links en columna vertical para evitar que se corten ──
         JPanel linksCol = new JPanel();
         linksCol.setLayout(new BoxLayout(linksCol, BoxLayout.Y_AXIS));
         linksCol.setBackground(AppColors.bgCard());
@@ -172,7 +189,8 @@ public class LoginFrame extends JFrame {
         content.setOpaque(false);
         content.setBorder(new EmptyBorder(0, 50, 0, 50));
 
-        JLabel logoImg = buildLogoImage(64);
+        // Mantenemos el tamaño grande en 130 tal como pediste
+        JLabel logoImg = buildLogoImage(130);
         logoImg.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         JLabel brand = new JLabel("OrganizaVix");
@@ -201,7 +219,7 @@ public class LoginFrame extends JFrame {
         }
 
         content.add(logoImg);
-        content.add(Box.createVerticalStrut(20));
+        content.add(Box.createVerticalStrut(8));
         content.add(brand);
         content.add(Box.createVerticalStrut(14));
         content.add(tagline);
@@ -283,12 +301,7 @@ public class LoginFrame extends JFrame {
 
     // ─── Static Helpers ───────────────────────────────────────────────
 
-    /**
-     * FIX: Usa RenderingHints de alta calidad para escalar el logo sin pixelado.
-     * Carga la imagen nativa y la redibuja en un BufferedImage con interpolación
-     * bicúbica.
-     */
-    public static JLabel buildLogoImage(int size) {
+    public static JLabel buildLogoImage(int targetHeight) {
         try {
             URL url = LoginFrame.class.getResource("/assets/logo.png");
             if (url == null)
@@ -306,61 +319,65 @@ public class LoginFrame extends JFrame {
                 int iw = raw.getIconWidth();
                 int ih = raw.getIconHeight();
 
-                // --- Center-crop to square so rectangular logos don't distort ---
-                BufferedImage hq = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
-                Graphics2D g2 = hq.createGraphics();
-                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                        RenderingHints.VALUE_INTERPOLATION_BICUBIC);
-                g2.setRenderingHint(RenderingHints.KEY_RENDERING,
-                        RenderingHints.VALUE_RENDER_QUALITY);
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
-                        RenderingHints.VALUE_ANTIALIAS_ON);
+                int finalH = targetHeight;
+                int finalW = targetHeight;
 
                 if (iw > 0 && ih > 0) {
-                    // Determine square crop from center
-                    int crop = Math.min(iw, ih);
-                    int srcX = (iw - crop) / 2;
-                    int srcY = (ih - crop) / 2;
-                    // Draw the cropped region scaled into the square output
-                    g2.drawImage(original,
-                            0, 0, size, size,
-                            srcX, srcY, srcX + crop, srcY + crop,
-                            null);
-                } else {
-                    g2.drawImage(original, 0, 0, size, size, null);
+                    finalW = (int) (iw * ((double) finalH / ih));
                 }
+
+                BufferedImage hq = new BufferedImage(finalW, finalH, BufferedImage.TYPE_INT_ARGB);
+                Graphics2D g2 = hq.createGraphics();
+                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+                g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                g2.drawImage(original, 0, 0, finalW, finalH, null);
                 g2.dispose();
 
-                return new JLabel(new ImageIcon(hq));
+                JLabel lbl = new JLabel(new ImageIcon(hq));
+
+                // SOLUCIÓN DEFINITIVA: Candado de tamaño para que Swing no desalinee
+                lbl.setMaximumSize(new Dimension(finalW, finalH));
+                lbl.setPreferredSize(new Dimension(finalW, finalH));
+                lbl.setMinimumSize(new Dimension(finalW, finalH));
+
+                lbl.setAlignmentX(Component.LEFT_ALIGNMENT);
+                lbl.setHorizontalAlignment(SwingConstants.LEFT);
+                lbl.setBorder(null);
+
+                return lbl;
             }
         } catch (Exception ignored) {
         }
 
-        // Fallback pintado — igual de antes
-        return new JLabel() {
+        JLabel fallbackLabel = new JLabel() {
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setColor(AppColors.ACCENT);
-                g2.fill(new RoundRectangle2D.Float(0, 0, size, size, size / 4f, size / 4f));
+                g2.fill(new RoundRectangle2D.Float(0, 0, targetHeight, targetHeight, targetHeight / 4f,
+                        targetHeight / 4f));
                 g2.setColor(Color.WHITE);
-                int fs = size / 3;
+                int fs = targetHeight / 3;
                 g2.setFont(new Font("Segoe UI", Font.BOLD, fs));
                 FontMetrics fm = g2.getFontMetrics();
                 g2.drawString("OV",
-                        (size - fm.stringWidth("OV")) / 2,
-                        size / 2 + fm.getAscent() / 2 - 2);
+                        (targetHeight - fm.stringWidth("OV")) / 2,
+                        targetHeight / 2 + fm.getAscent() / 2 - 2);
                 g2.dispose();
             }
 
             public Dimension getPreferredSize() {
-                return new Dimension(size, size);
+                return new Dimension(targetHeight, targetHeight);
             }
 
             public Dimension getMinimumSize() {
-                return new Dimension(size, size);
+                return new Dimension(targetHeight, targetHeight);
             }
         };
+
+        return fallbackLabel;
     }
 
     public static JTextField buildTextField(String placeholder) {

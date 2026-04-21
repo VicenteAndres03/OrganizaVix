@@ -88,4 +88,19 @@ public class AnimationUtil {
         });
         t.start();
     }
+
+    // Efecto de flotación suave
+    public static void addFloatingEffect(JComponent comp) {
+        Timer timer = new Timer(40, null);
+        int[] tick = { 0 };
+        timer.addActionListener(e -> {
+            tick[0]++;
+            // Oscilación suave usando seno
+            int offset = (int) (Math.sin(tick[0] * 0.1) * 5);
+            // Usa márgenes dinámicos para simular el movimiento sin afectar el layout
+            // general
+            comp.setBorder(BorderFactory.createEmptyBorder(10 + offset, 0, 10 - offset, 0));
+        });
+        timer.start();
+    }
 }

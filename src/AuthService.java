@@ -116,16 +116,14 @@ public class AuthService {
         }
     }
 
-    // Genera token de recuperación y lo guarda en BD
     public static String generarTokenRecuperacion(String email) {
-        // Verificar que el email existe
         String checkSql = "SELECT id FROM usuarios WHERE email = ?";
         try (Connection conn = DatabaseConnection.getConnection();
                 PreparedStatement ps = conn.prepareStatement(checkSql)) {
             ps.setString(1, email);
             ResultSet rs = ps.executeQuery();
             if (!rs.next())
-                return null; // email no existe
+                return null;
         } catch (SQLException e) {
             return null;
         }
@@ -147,7 +145,6 @@ public class AuthService {
         }
     }
 
-    // Verifica el código y cambia la contraseña
     public static boolean resetPassword(String email, String token, String nuevaPassword) {
         String checkSql = """
                     SELECT id FROM reset_tokens
@@ -162,14 +159,12 @@ public class AuthService {
                 return false;
             int tokenId = rs.getInt("id");
 
-            // Marcar token como usado
             String markSql = "UPDATE reset_tokens SET usado = TRUE WHERE id = ?";
             try (PreparedStatement ps2 = conn.prepareStatement(markSql)) {
                 ps2.setInt(1, tokenId);
                 ps2.executeUpdate();
             }
 
-            // Cambiar contraseña
             String updateSql = "UPDATE usuarios SET password = ? WHERE email = ?";
             try (PreparedStatement ps3 = conn.prepareStatement(updateSql)) {
                 ps3.setString(1, hashPassword(nuevaPassword));
@@ -179,6 +174,51 @@ public class AuthService {
             return true;
         } catch (SQLException e) {
             System.err.println("Error al resetear password: " + e.getMessage());
+            return false;
+        }
+    }
+
+    // ── NUEVOS MÉTODOS PARA EL PERFIL ───────────────────────────────────────
+
+    public static boolean changePassword(int userId, String currentPassword, String newPassword) {
+        String sqlCheck = "SELECT password FROM usuarios WHERE id = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+                PreparedStatement ps = conn.prepareStatement(sqlCheck)) {
+            ps.setInt(1, userId);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) {
+                // Verificar que la contraseña actual es correcta
+                if (rs.getString("password").equals(hashPassword(currentPassword))) {
+                    String sqlUpd = "UPDATE usuarios SET password = ? WHERE id = ?";
+                    try (PreparedStatement ps2 = conn.prepareStatement(sqlUpd)) {
+                        ps2.setString(1, hashPassword(newPassword));
+                        ps2.setInt(2, userId);
+                        ps2.executeUpdate();
+                        return true;
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Error al cambiar contraseña: " + e.getMessage());
+        }
+        return false;
+    }
+
+    public static boolean deleteAccount(int userId) {
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            // 1. Eliminar tareas para no romper las llaves foráneas
+            try (PreparedStatement ps1 = conn.prepareStatement("DELETE FROM tareas WHERE usuario_id = ?")) {
+                ps1.setInt(1, userId);
+                ps1.executeUpdate();
+            }
+            // 2. Eliminar el usuario
+            try (PreparedStatement ps2 = conn.prepareStatement("DELETE FROM usuarios WHERE id = ?")) {
+                ps2.setInt(1, userId);
+                ps2.executeUpdate();
+            }
+            return true;
+        } catch (SQLException e) {
+            System.err.println("Error al eliminar cuenta: " + e.getMessage());
             return false;
         }
     }

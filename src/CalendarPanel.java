@@ -138,7 +138,8 @@ public class CalendarPanel extends JPanel {
             JPanel celda = crearCelda(fechaFinal);
             celda.addMouseListener(new MouseAdapter() {
                 public void mouseClicked(MouseEvent e) {
-                    mostrarDialogoNuevaTareaEnFecha(fechaFinal);
+                    // ¡MAGIA! En lugar de abrir un diálogo, viajamos al Kanban de esa fecha
+                    homeFrame.abrirKanbanEnFecha(fechaFinal.toString());
                 }
 
                 public void mouseEntered(MouseEvent e) {
@@ -189,69 +190,5 @@ public class CalendarPanel extends JPanel {
         }
 
         return celda;
-    }
-
-    private void mostrarDialogoNuevaTareaEnFecha(LocalDate fecha) {
-        JDialog dialog = new JDialog(
-                (Frame) SwingUtilities.getWindowAncestor(this),
-                "Nueva tarea — " + fecha, true);
-        dialog.setSize(360, 420);
-        dialog.setLocationRelativeTo(this);
-        dialog.getContentPane().setBackground(AppColors.bgCard());
-
-        JPanel panel = new JPanel();
-        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        panel.setBackground(AppColors.bgCard());
-        panel.setBorder(new EmptyBorder(24, 24, 24, 24));
-
-        JTextField tituloF = LoginFrame.buildTextField("Título de la tarea");
-        LoginFrame.styleField(tituloF);
-
-        JTextField descF = LoginFrame.buildTextField("Descripción (opcional)");
-        LoginFrame.styleField(descF);
-
-        String[] prioridades = { "alta", "media", "baja" };
-        JComboBox<String> prioBox = new JComboBox<>(prioridades);
-        prioBox.setSelectedIndex(1);
-        prioBox.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        prioBox.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
-
-        JButton guardar = LoginFrame.buildAccentButton("Guardar tarea");
-        guardar.addActionListener(e -> {
-            String t = tituloF.getText().trim();
-            if (t.isEmpty() || t.equals("Título de la tarea"))
-                return;
-            String sql = "INSERT INTO tareas (usuario_id, titulo, descripcion, estado, fecha, prioridad) VALUES (?,?,?,'pendiente',?,?)";
-            try (Connection conn = DatabaseConnection.getConnection();
-                    PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setInt(1, userId);
-                ps.setString(2, t);
-                ps.setString(3, descF.getText().trim());
-                ps.setDate(4, java.sql.Date.valueOf(fecha));
-                ps.setString(5, (String) prioBox.getSelectedItem());
-                ps.executeUpdate();
-                dialog.dispose();
-                cargarTareas();
-            } catch (Exception ex) {
-                JOptionPane.showMessageDialog(dialog, "Error: " + ex.getMessage());
-            }
-        });
-
-        panel.add(LoginFrame.buildLabel("Título"));
-        panel.add(Box.createVerticalStrut(6));
-        panel.add(tituloF);
-        panel.add(Box.createVerticalStrut(12));
-        panel.add(LoginFrame.buildLabel("Descripción"));
-        panel.add(Box.createVerticalStrut(6));
-        panel.add(descF);
-        panel.add(Box.createVerticalStrut(12));
-        panel.add(LoginFrame.buildLabel("Prioridad"));
-        panel.add(Box.createVerticalStrut(6));
-        panel.add(prioBox);
-        panel.add(Box.createVerticalStrut(16));
-        panel.add(guardar);
-
-        dialog.setContentPane(panel);
-        dialog.setVisible(true);
     }
 }
