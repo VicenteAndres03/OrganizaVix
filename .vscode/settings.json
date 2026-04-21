@@ -1,0 +1,9 @@
+{
+    "java.project.sourcePaths": [
+        "src"
+    ],
+    "java.project.referencedLibraries": [
+        "lib\\javax.mail-1.6.2.jar",
+        "c:\\Users\\vixho\\Documents\\Aplicacion\\LoginApp\\lib\\postgresql-42.7.3.jar"
+    ]
+}
