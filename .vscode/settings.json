@@ -3,7 +3,7 @@
         "src"
     ],
     "java.project.referencedLibraries": [
-        "lib\\jakarta.activation-2.0.1.jar",
+        "lib\\javax.activation-1.2.0.jar",
         "c:\\Users\\vixho\\Documents\\Aplicacion\\LoginApp\\lib\\postgresql-42.7.3.jar",
         "c:\\Users\\vixho\\Documents\\Aplicacion\\LoginApp\\lib\\javax.mail-1.6.2.jar"
     ]

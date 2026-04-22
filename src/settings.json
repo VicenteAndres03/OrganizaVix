@@ -1,0 +1,8 @@
+{
+    "java.project.sourcePaths": ["src"],
+    "java.project.referencedLibraries": [
+        "lib\\javax.activation-1.2.0.jar",
+        "lib\\javax.mail-1.6.2.jar",
+        "lib\\postgresql-42.7.3.jar"
+    ]
+}

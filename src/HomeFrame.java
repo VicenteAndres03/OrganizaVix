@@ -16,14 +16,22 @@ public class HomeFrame extends JFrame {
     private KanbanPanel kanbanPanel;
     private CalendarPanel calendarPanel;
     private StatsPanel statsPanel;
-    private ProfilePanel profilePanel; // Añadido
+    private ProfilePanel profilePanel;
+    private NotificationPanel notificationPanel;
 
     private CardLayout cardLayout;
     private JLabel pageTitle, appLabel;
     private JButton activeNav, themeBtn;
-    private JButton kanbanBtn, calBtn, statsBtn, profileBtn; // Añadido
+    private JButton kanbanBtn, calBtn, statsBtn, profileBtn;
     private JLabel logoImgLabel;
     private JButton logoutBtn;
+
+    // Topbar extras
+    private JTextField searchField;
+    private JButton notifBtn;
+    private JLabel notifBadge;
+    private boolean notifPanelVisible = false;
+    private JPanel rightPanel; // contenedor central + notif
 
     public HomeFrame(String email) {
         this.email = email;
@@ -31,7 +39,7 @@ public class HomeFrame extends JFrame {
         setTitle("OrganizaVix");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setMinimumSize(new Dimension(800, 550));
-        setSize(1100, 680);
+        setSize(1200, 700);
         setLocationRelativeTo(null);
         loadIcon();
         initUI();
@@ -41,14 +49,15 @@ public class HomeFrame extends JFrame {
             kanbanPanel = new KanbanPanel(userId, this);
             calendarPanel = new CalendarPanel(userId, this);
             statsPanel = new StatsPanel(userId);
-            profilePanel = new ProfilePanel(userId, email, this); // Añadido
+            profilePanel = new ProfilePanel(userId, email, this);
 
             SwingUtilities.invokeLater(() -> {
                 mainContent.add(kanbanPanel, "kanban");
                 mainContent.add(calendarPanel, "calendar");
                 mainContent.add(statsPanel, "stats");
-                mainContent.add(profilePanel, "profile"); // Añadido
+                mainContent.add(profilePanel, "profile");
                 cardLayout.show(mainContent, "kanban");
+                refreshNotifBadge();
             });
         }).start();
     }
@@ -61,9 +70,7 @@ public class HomeFrame extends JFrame {
             if (url != null) {
                 ImageIcon rawIcon = new ImageIcon(url);
                 Image rawImg = rawIcon.getImage();
-                int w = rawIcon.getIconWidth();
-                int h = rawIcon.getIconHeight();
-
+                int w = rawIcon.getIconWidth(), h = rawIcon.getIconHeight();
                 if (w > 0 && h > 0) {
                     int size = Math.max(w, h);
                     BufferedImage sq = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
@@ -72,9 +79,8 @@ public class HomeFrame extends JFrame {
                     g2.drawImage(rawImg, (size - w) / 2, (size - h) / 2, w, h, null);
                     g2.dispose();
                     setIconImage(sq);
-                } else {
+                } else
                     setIconImage(rawImg);
-                }
             }
         } catch (Exception ignored) {
         }
@@ -100,7 +106,9 @@ public class HomeFrame extends JFrame {
         setLayout(new BorderLayout());
         getContentPane().setBackground(AppColors.bg());
 
+        // ── Sidebar ──────────────────────────────────────────────────
         sidebar = new JPanel() {
+            @Override
             protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
                 g.setColor(sidebarBorder());
@@ -109,7 +117,7 @@ public class HomeFrame extends JFrame {
         };
         sidebar.setLayout(new BoxLayout(sidebar, BoxLayout.Y_AXIS));
         sidebar.setBackground(sidebarBg());
-        sidebar.setPreferredSize(new Dimension(280, 0));
+        sidebar.setPreferredSize(new Dimension(260, 0));
         sidebar.setBorder(new EmptyBorder(20, 14, 20, 14));
 
         logoRow = new JPanel();
@@ -117,7 +125,7 @@ public class HomeFrame extends JFrame {
         logoRow.setOpaque(false);
         logoRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 180));
 
-        logoImgLabel = buildLogoLabel(130);
+        logoImgLabel = buildLogoLabel(110);
         logoImgLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         appLabel = new JLabel("OrganizaVix");
@@ -135,7 +143,7 @@ public class HomeFrame extends JFrame {
         kanbanBtn = buildNavBtn("Kanban", "kanban");
         calBtn = buildNavBtn("Calendario", "calendar");
         statsBtn = buildNavBtn("Estadísticas", "stats");
-        profileBtn = buildNavBtn("Mi Perfil", "profile"); // Añadido
+        profileBtn = buildNavBtn("Mi Perfil", "profile");
 
         activeNav = kanbanBtn;
         setNavActive(kanbanBtn);
@@ -147,7 +155,7 @@ public class HomeFrame extends JFrame {
         });
         calBtn.addActionListener(e -> navigate("calendar", calBtn));
         statsBtn.addActionListener(e -> navigate("stats", statsBtn));
-        profileBtn.addActionListener(e -> navigate("profile", profileBtn)); // Añadido
+        profileBtn.addActionListener(e -> navigate("profile", profileBtn));
 
         boolean isDark = ThemeManager.isDark();
         themeBtn = buildSecondaryBtn(isDark ? "Modo claro" : "Modo oscuro", isDark ? "sun" : "moon", false);
@@ -168,34 +176,39 @@ public class HomeFrame extends JFrame {
         sidebar.add(logoRow);
         sidebar.add(Box.createVerticalStrut(24));
         sidebar.add(userCard);
-        sidebar.add(Box.createVerticalStrut(24));
+        sidebar.add(Box.createVerticalStrut(28));
+
+        // Separador sutil
+        JPanel navSep = new JPanel();
+        navSep.setOpaque(false);
+        navSep.setMaximumSize(new Dimension(Integer.MAX_VALUE, 1));
+        navSep.setBorder(BorderFactory.createMatteBorder(0, 8, 1, 8, sidebarBorder()));
+        sidebar.add(navSep);
+        sidebar.add(Box.createVerticalStrut(16));
+
+        sidebar.add(buildNavSection("NAVEGACIÓN"));
+        sidebar.add(Box.createVerticalStrut(4));
         sidebar.add(kanbanBtn);
-        sidebar.add(Box.createVerticalStrut(6));
+        sidebar.add(Box.createVerticalStrut(4));
         sidebar.add(calBtn);
-        sidebar.add(Box.createVerticalStrut(6));
+        sidebar.add(Box.createVerticalStrut(4));
         sidebar.add(statsBtn);
-        sidebar.add(Box.createVerticalStrut(6));
-        sidebar.add(profileBtn); // Añadido
+        sidebar.add(Box.createVerticalStrut(4));
+        sidebar.add(profileBtn);
         sidebar.add(Box.createVerticalGlue());
         sidebar.add(themeBtn);
-        sidebar.add(Box.createVerticalStrut(8));
+        sidebar.add(Box.createVerticalStrut(6));
         sidebar.add(logoutBtn);
 
-        topbar = new JPanel(new BorderLayout());
-        topbar.setBackground(AppColors.bg());
-        topbar.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createMatteBorder(0, 0, 1, 0, AppColors.border()),
-                new EmptyBorder(14, 24, 14, 24)));
+        // ── Topbar ────────────────────────────────────────────────────
+        topbar = buildTopbar();
 
-        pageTitle = new JLabel("Tablero Kanban");
-        pageTitle.setFont(new Font("Segoe UI", Font.BOLD, 20));
-        pageTitle.setForeground(AppColors.textPrimary());
-        topbar.add(pageTitle, BorderLayout.WEST);
-
+        // ── Content ───────────────────────────────────────────────────
         cardLayout = new CardLayout();
         mainContent = new JPanel(cardLayout);
         mainContent.setBackground(AppColors.bg());
 
+        // Panel que contiene topbar + contenido + notif
         centerPanel = new JPanel(new BorderLayout());
         centerPanel.setBackground(AppColors.bg());
         centerPanel.add(topbar, BorderLayout.NORTH);
@@ -211,10 +224,205 @@ public class HomeFrame extends JFrame {
         });
     }
 
-    public void abrirKanbanEnFecha(String fecha) {
-        if (kanbanPanel != null) {
-            kanbanPanel.setFechaFiltro(fecha);
+    private JPanel buildTopbar() {
+        JPanel bar = new JPanel(new BorderLayout(16, 0));
+        bar.setBackground(AppColors.bg());
+        bar.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, 0, 1, 0, AppColors.border()),
+                new EmptyBorder(12, 24, 12, 20)));
+
+        pageTitle = new JLabel("Tablero Kanban");
+        pageTitle.setFont(new Font("Segoe UI", Font.BOLD, 20));
+        pageTitle.setForeground(AppColors.textPrimary());
+
+        // ── Search bar ───────────────────────────────────────────────
+        JPanel searchWrap = new JPanel(new BorderLayout()) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(AppColors.bgSecondary());
+                g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 10, 10));
+                g2.setColor(AppColors.border());
+                g2.draw(new RoundRectangle2D.Float(0, 0, getWidth() - 1, getHeight() - 1, 10, 10));
+                g2.dispose();
+            }
+        };
+        searchWrap.setOpaque(false);
+        searchWrap.setPreferredSize(new Dimension(260, 36));
+        searchWrap.setBorder(new EmptyBorder(0, 10, 0, 10));
+
+        JLabel searchIcon = new JLabel("🔍");
+        searchIcon.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        searchIcon.setBorder(new EmptyBorder(0, 0, 0, 6));
+
+        searchField = new JTextField();
+        searchField.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        searchField.setBackground(new Color(0, 0, 0, 0));
+        searchField.setOpaque(false);
+        searchField.setForeground(AppColors.textPrimary());
+        searchField.setCaretColor(AppColors.textPrimary());
+        searchField.setBorder(null);
+        searchField.setText("Buscar tareas…");
+        searchField.setForeground(AppColors.textMuted());
+
+        searchField.addFocusListener(new FocusAdapter() {
+            public void focusGained(FocusEvent e) {
+                if (searchField.getText().equals("Buscar tareas…")) {
+                    searchField.setText("");
+                    searchField.setForeground(AppColors.textPrimary());
+                }
+            }
+
+            public void focusLost(FocusEvent e) {
+                if (searchField.getText().isEmpty()) {
+                    searchField.setText("Buscar tareas…");
+                    searchField.setForeground(AppColors.textMuted());
+                }
+            }
+        });
+
+        searchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            private void update() {
+                String q = searchField.getText();
+                if (q.equals("Buscar tareas…"))
+                    q = "";
+                if (kanbanPanel != null)
+                    kanbanPanel.setSearchQuery(q);
+            }
+
+            public void insertUpdate(javax.swing.event.DocumentEvent e) {
+                update();
+            }
+
+            public void removeUpdate(javax.swing.event.DocumentEvent e) {
+                update();
+            }
+
+            public void changedUpdate(javax.swing.event.DocumentEvent e) {
+                update();
+            }
+        });
+
+        searchWrap.add(searchIcon, BorderLayout.WEST);
+        searchWrap.add(searchField, BorderLayout.CENTER);
+
+        // ── Notif button + badge ──────────────────────────────────────
+        JPanel rightControls = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        rightControls.setOpaque(false);
+
+        JPanel notifWrap = new JPanel(null); // null layout for badge positioning
+        notifWrap.setOpaque(false);
+        notifWrap.setPreferredSize(new Dimension(40, 36));
+
+        notifBtn = new JButton() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                if (getModel().isRollover() || notifPanelVisible) {
+                    g2.setColor(AppColors.bgHover());
+                    g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 8, 8));
+                }
+                g2.setColor(notifPanelVisible ? AppColors.ACCENT : AppColors.textSecondary());
+                g2.setFont(new Font("Segoe UI", Font.PLAIN, 18));
+                FontMetrics fm = g2.getFontMetrics();
+                g2.drawString("🔔", (getWidth() - fm.stringWidth("🔔")) / 2,
+                        (getHeight() + fm.getAscent() - fm.getDescent()) / 2);
+                g2.dispose();
+            }
+        };
+        notifBtn.setContentAreaFilled(false);
+        notifBtn.setBorderPainted(false);
+        notifBtn.setFocusPainted(false);
+        notifBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        notifBtn.setBounds(0, 2, 36, 32);
+        notifBtn.setToolTipText("Notificaciones del día");
+        notifBtn.addActionListener(e -> toggleNotifPanel());
+
+        notifBadge = new JLabel("") {
+            @Override
+            protected void paintComponent(Graphics g) {
+                if (getText().isEmpty())
+                    return;
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(new Color(239, 68, 68));
+                g2.fillOval(0, 0, getWidth(), getHeight());
+                g2.setColor(Color.WHITE);
+                g2.setFont(new Font("Segoe UI", Font.BOLD, 9));
+                FontMetrics fm = g2.getFontMetrics();
+                g2.drawString(getText(), (getWidth() - fm.stringWidth(getText())) / 2,
+                        (getHeight() + fm.getAscent() - fm.getDescent()) / 2);
+                g2.dispose();
+            }
+
+            @Override
+            public Dimension getPreferredSize() {
+                return new Dimension(16, 16);
+            }
+        };
+        notifBadge.setBounds(20, 0, 16, 16);
+        notifBadge.setHorizontalAlignment(SwingConstants.CENTER);
+
+        notifWrap.add(notifBtn);
+        notifWrap.add(notifBadge);
+
+        rightControls.add(searchWrap);
+        rightControls.add(notifWrap);
+
+        bar.add(pageTitle, BorderLayout.WEST);
+        bar.add(rightControls, BorderLayout.EAST);
+        return bar;
+    }
+
+    private void toggleNotifPanel() {
+        notifPanelVisible = !notifPanelVisible;
+        notifBtn.repaint();
+
+        if (notifPanelVisible) {
+            notificationPanel = new NotificationPanel(userId, () -> {
+                notifPanelVisible = false;
+                notifBtn.repaint();
+                centerPanel.remove(notificationPanel);
+                centerPanel.revalidate();
+                centerPanel.repaint();
+            });
+            notificationPanel.loadNotifications();
+            centerPanel.add(notificationPanel, BorderLayout.EAST);
+        } else {
+            if (notificationPanel != null)
+                centerPanel.remove(notificationPanel);
         }
+        centerPanel.revalidate();
+        centerPanel.repaint();
+    }
+
+    public void refreshNotifBadge() {
+        new Thread(() -> {
+            // Contar tareas pendientes de hoy
+            int count = 0;
+            String sql = "SELECT COUNT(*) FROM tareas WHERE usuario_id=? AND estado!='terminado' AND (fecha=CURRENT_DATE OR es_diaria=TRUE)";
+            try (java.sql.Connection conn = DatabaseConnection.getConnection();
+                    java.sql.PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, userId);
+                java.sql.ResultSet rs = ps.executeQuery();
+                if (rs.next())
+                    count = rs.getInt(1);
+            } catch (java.sql.SQLException e) {
+                System.err.println("Badge: " + e.getMessage());
+            }
+            final int finalCount = count;
+            SwingUtilities.invokeLater(() -> {
+                notifBadge.setText(finalCount > 0 ? String.valueOf(Math.min(finalCount, 99)) : "");
+                notifBadge.repaint();
+            });
+        }).start();
+    }
+
+    public void abrirKanbanEnFecha(String fecha) {
+        if (kanbanPanel != null)
+            kanbanPanel.setFechaFiltro(fecha);
         navigate("kanban", kanbanBtn);
     }
 
@@ -224,11 +432,16 @@ public class HomeFrame extends JFrame {
             setNavInactive(activeNav);
         setNavActive(btn);
         activeNav = btn;
+
+        // Ocultar buscador fuera del kanban
+        searchField.setVisible(panel.equals("kanban"));
+
         switch (panel) {
             case "kanban" -> {
                 pageTitle.setText("Tablero Kanban");
                 if (kanbanPanel != null)
                     kanbanPanel.cargarTareas();
+                refreshNotifBadge();
             }
             case "calendar" -> {
                 pageTitle.setText("Calendario");
@@ -266,9 +479,9 @@ public class HomeFrame extends JFrame {
         getContentPane().setBackground(AppColors.bg());
         sidebar.setBackground(sidebarBg());
         sidebar.repaint();
-
         appLabel.setForeground(ThemeManager.isDark() ? Color.WHITE : new Color(20, 25, 40));
 
+        // Reconstruir userCard
         String nombre = AuthService.getNombre(email);
         int userCardIndex = -1;
         Component[] sidebarComps = sidebar.getComponents();
@@ -290,18 +503,19 @@ public class HomeFrame extends JFrame {
             else
                 setNavInactive(btn);
         }
-
         themeBtn.setForeground(sidebarText());
 
+        // Topbar
         topbar.setBackground(AppColors.bg());
         topbar.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createMatteBorder(0, 0, 1, 0, AppColors.border()),
-                new EmptyBorder(14, 24, 14, 24)));
+                new EmptyBorder(12, 24, 12, 20)));
         pageTitle.setForeground(AppColors.textPrimary());
+        searchField.setBackground(new Color(0, 0, 0, 0));
+        searchField.setForeground(AppColors.textMuted());
 
         centerPanel.setBackground(AppColors.bg());
         mainContent.setBackground(AppColors.bg());
-        topbar.repaint();
 
         if (kanbanPanel != null) {
             kanbanPanel.setBackground(AppColors.bg());
@@ -311,9 +525,8 @@ public class HomeFrame extends JFrame {
             calendarPanel.setBackground(AppColors.bg());
             calendarPanel.cargarTareas();
         }
-        if (statsPanel != null) {
+        if (statsPanel != null)
             statsPanel.setBackground(AppColors.bg());
-        }
         if (profilePanel != null) {
             profilePanel.setBackground(AppColors.bg());
             profilePanel.refreshColors();
@@ -321,10 +534,24 @@ public class HomeFrame extends JFrame {
 
         sidebar.revalidate();
         sidebar.repaint();
+        topbar.revalidate();
+        topbar.repaint();
         repaint();
         revalidate();
     }
 
+    // ── Nav section label ────────────────────────────────────────────
+    private JLabel buildNavSection(String text) {
+        JLabel lbl = new JLabel(text);
+        lbl.setFont(new Font("Segoe UI", Font.BOLD, 10));
+        lbl.setForeground(ThemeManager.isDark() ? new Color(80, 80, 110) : new Color(160, 170, 185));
+        lbl.setBorder(new EmptyBorder(0, 20, 4, 0));
+        lbl.setAlignmentX(Component.LEFT_ALIGNMENT);
+        lbl.setMaximumSize(new Dimension(Integer.MAX_VALUE, 20));
+        return lbl;
+    }
+
+    // ── UserCard ─────────────────────────────────────────────────────
     private JPanel buildUserCard(String nombre) {
         JPanel card = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 10)) {
             @Override
@@ -337,9 +564,7 @@ public class HomeFrame extends JFrame {
             }
         };
         card.setOpaque(false);
-        card.setBackground(ThemeManager.isDark()
-                ? new Color(255, 255, 255, 12)
-                : new Color(124, 58, 237, 15));
+        card.setBackground(ThemeManager.isDark() ? new Color(255, 255, 255, 12) : new Color(124, 58, 237, 15));
         card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 60));
         card.setAlignmentX(Component.LEFT_ALIGNMENT);
 
@@ -353,7 +578,9 @@ public class HomeFrame extends JFrame {
         welcomeLbl.setFont(new Font("Segoe UI", Font.PLAIN, 11));
         welcomeLbl.setForeground(ThemeManager.isDark() ? new Color(150, 150, 170) : new Color(100, 110, 120));
 
-        JLabel userLbl = new JLabel(nombre);
+        // Truncar nombre largo
+        String displayName = nombre.length() > 18 ? nombre.substring(0, 16) + "…" : nombre;
+        JLabel userLbl = new JLabel(displayName);
         userLbl.setFont(new Font("Segoe UI", Font.BOLD, 14));
         userLbl.setForeground(ThemeManager.isDark() ? new Color(240, 240, 250) : new Color(30, 40, 50));
 
@@ -381,40 +608,32 @@ public class HomeFrame extends JFrame {
                 } catch (InterruptedException ignored) {
                 }
 
-                int iw = raw.getIconWidth();
-                int ih = raw.getIconHeight();
-
+                int iw = raw.getIconWidth(), ih = raw.getIconHeight();
                 int finalH = targetHeight;
-                int finalW = targetHeight;
-
-                if (iw > 0 && ih > 0) {
-                    finalW = (int) (iw * ((double) finalH / ih));
-                }
+                int finalW = (iw > 0 && ih > 0) ? (int) (iw * ((double) finalH / ih)) : targetHeight;
 
                 BufferedImage hq = new BufferedImage(finalW, finalH, BufferedImage.TYPE_INT_ARGB);
                 Graphics2D g2 = hq.createGraphics();
                 g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
                 g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
                 g2.drawImage(original, 0, 0, finalW, finalH, null);
                 g2.dispose();
 
                 JLabel lbl = new JLabel(new ImageIcon(hq));
-
                 lbl.setMaximumSize(new Dimension(finalW, finalH));
                 lbl.setPreferredSize(new Dimension(finalW, finalH));
                 lbl.setMinimumSize(new Dimension(finalW, finalH));
                 lbl.setAlignmentX(Component.LEFT_ALIGNMENT);
                 lbl.setHorizontalAlignment(SwingConstants.LEFT);
                 lbl.setBorder(null);
-
                 return lbl;
             }
         } catch (Exception ignored) {
         }
 
         return new JLabel() {
+            @Override
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -424,9 +643,8 @@ public class HomeFrame extends JFrame {
                 g2.setColor(Color.WHITE);
                 g2.setFont(new Font("Segoe UI", Font.BOLD, targetHeight / 3));
                 FontMetrics fm = g2.getFontMetrics();
-                int tx = (targetHeight - fm.stringWidth("OV")) / 2;
-                int ty = targetHeight / 2 + fm.getAscent() / 2 - 2;
-                g2.drawString("OV", tx, ty);
+                g2.drawString("OV", (targetHeight - fm.stringWidth("OV")) / 2,
+                        targetHeight / 2 + fm.getAscent() / 2 - 2);
                 g2.dispose();
             }
 
@@ -446,21 +664,19 @@ public class HomeFrame extends JFrame {
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
                 Boolean active = (Boolean) getClientProperty("active");
-                boolean isActive = (active != null && active);
+                boolean isActive = active != null && active;
                 boolean isHover = getModel().isRollover();
 
                 if (isActive) {
                     g2.setColor(navActiveBg());
                     g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 12, 12));
                     g2.setColor(new Color(124, 58, 237));
-                    g2.fill(new RoundRectangle2D.Float(0, getHeight() * 0.25f, 4, getHeight() * 0.5f, 4, 4));
+                    g2.fill(new RoundRectangle2D.Float(0, getHeight() * 0.2f, 3, getHeight() * 0.6f, 4, 4));
                 } else if (isHover) {
                     g2.setColor(ThemeManager.isDark() ? new Color(255, 255, 255, 15) : new Color(0, 0, 0, 10));
                     g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 12, 12));
                 }
-
                 super.paintComponent(g);
                 g2.dispose();
             }
@@ -475,11 +691,9 @@ public class HomeFrame extends JFrame {
         btn.setHorizontalAlignment(SwingConstants.LEFT);
         btn.setAlignmentX(Component.LEFT_ALIGNMENT);
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-
         btn.setIcon(new VectorIcon(iconType));
         btn.setIconTextGap(14);
-        btn.setBorder(new EmptyBorder(10, 20, 10, 16));
-
+        btn.setBorder(new EmptyBorder(10, 18, 10, 16));
         return btn;
     }
 
@@ -490,11 +704,8 @@ public class HomeFrame extends JFrame {
                 if (getModel().isRollover()) {
                     Graphics2D g2 = (Graphics2D) g.create();
                     g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                    if (isAlert) {
-                        g2.setColor(new Color(239, 68, 68, 25));
-                    } else {
-                        g2.setColor(ThemeManager.isDark() ? new Color(255, 255, 255, 15) : new Color(0, 0, 0, 10));
-                    }
+                    g2.setColor(isAlert ? new Color(239, 68, 68, 25)
+                            : (ThemeManager.isDark() ? new Color(255, 255, 255, 15) : new Color(0, 0, 0, 10)));
                     g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 10, 10));
                     g2.dispose();
                 }
@@ -511,25 +722,25 @@ public class HomeFrame extends JFrame {
         btn.setHorizontalAlignment(SwingConstants.LEFT);
         btn.setAlignmentX(Component.LEFT_ALIGNMENT);
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-
         btn.setIcon(new VectorIcon(iconType));
         btn.setIconTextGap(14);
-        btn.setBorder(new EmptyBorder(8, 20, 8, 16));
-
+        btn.setBorder(new EmptyBorder(8, 18, 8, 16));
         return btn;
     }
 
     private JPanel buildAvatar(String nombre) {
         return new JPanel() {
+            @Override
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(AppColors.ACCENT);
+                // Gradiente en el avatar
+                GradientPaint gp = new GradientPaint(0, 0, AppColors.ACCENT, 36, 36, AppColors.ACCENT_HOVER);
+                g2.setPaint(gp);
                 g2.fillOval(0, 0, 36, 36);
                 g2.setColor(Color.WHITE);
                 g2.setFont(new Font("Segoe UI", Font.BOLD, 14));
-                String initials = nombre.length() >= 2
-                        ? nombre.substring(0, 2).toUpperCase()
+                String initials = nombre.length() >= 2 ? nombre.substring(0, 2).toUpperCase()
                         : nombre.substring(0, 1).toUpperCase();
                 FontMetrics fm = g2.getFontMetrics();
                 g2.drawString(initials, (36 - fm.stringWidth(initials)) / 2, 23);
@@ -546,6 +757,7 @@ public class HomeFrame extends JFrame {
         };
     }
 
+    // ── VectorIcon ────────────────────────────────────────────────────
     private class VectorIcon implements Icon {
         private final String type;
 
@@ -553,26 +765,21 @@ public class HomeFrame extends JFrame {
             this.type = type;
         }
 
-        @Override
         public int getIconWidth() {
             return 20;
         }
 
-        @Override
         public int getIconHeight() {
             return 20;
         }
 
-        @Override
         public void paintIcon(Component c, Graphics g, int x, int y) {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g2.setColor(c.getForeground());
-            g2.setStroke(new BasicStroke(1.8f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-
-            int cx = x + 2;
-            int cy = y + 2;
-
+            g2.setStroke(
+                    new java.awt.BasicStroke(1.8f, java.awt.BasicStroke.CAP_ROUND, java.awt.BasicStroke.JOIN_ROUND));
+            int cx = x + 2, cy = y + 2;
             switch (type) {
                 case "kanban" -> {
                     g2.drawRoundRect(cx, cy + 1, 14, 12, 3, 3);
@@ -600,14 +807,11 @@ public class HomeFrame extends JFrame {
                 }
                 case "sun" -> {
                     g2.drawOval(cx + 3, cy + 3, 8, 8);
-                    g2.drawLine(cx + 7, cy - 2, cx + 7, cy);
-                    g2.drawLine(cx + 7, cy + 14, cx + 7, cy + 16);
-                    g2.drawLine(cx - 2, cy + 7, cx, cy + 7);
-                    g2.drawLine(cx + 14, cy + 7, cx + 16, cy + 7);
-                    g2.drawLine(cx + 1, cy + 1, cx + 2, cy + 2);
-                    g2.drawLine(cx + 13, cy + 13, cx + 12, cy + 12);
-                    g2.drawLine(cx + 1, cy + 13, cx + 2, cy + 12);
-                    g2.drawLine(cx + 13, cy + 1, cx + 12, cy + 2);
+                    for (int[] d : new int[][] { { cx + 7, cy - 2, cx + 7, cy }, { cx + 7, cy + 14, cx + 7, cy + 16 },
+                            { cx - 2, cy + 7, cx, cy + 7 }, { cx + 14, cy + 7, cx + 16, cy + 7 },
+                            { cx + 1, cy + 1, cx + 2, cy + 2 }, { cx + 13, cy + 13, cx + 12, cy + 12 },
+                            { cx + 1, cy + 13, cx + 2, cy + 12 }, { cx + 13, cy + 1, cx + 12, cy + 2 } })
+                        g2.drawLine(d[0], d[1], d[2], d[3]);
                 }
                 case "moon" -> {
                     Path2D p = new Path2D.Float();
